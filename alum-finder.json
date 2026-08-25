@@ -1,0 +1,229 @@
+{
+  "name": "Alum Finder",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "d95297cf-78e8-4dd8-a2b0-8b848486d5d6",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://google.serper.dev/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "YOUR_SERPER_API_KEY_HERE"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q\": \"site:linkedin.com/in (\\\"BITS Pilani\\\" OR \\\"Birla Institute of Technology and Science\\\") \\\"{{$json.company}}\\\" Singapore\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "130ec6c3-6ccb-488c-8430-656ab715ee22",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allItems = $input.all();\n\nlet output = [];\n\nfor (const inputItem of allItems) {\n\n  const company =\n    inputItem.json.searchParameters?.q?.match(/\"([^\"]+)\" Singapore$/)?.[1] || \"\";\n\n  const results = inputItem.json.organic || [];\n\n  const filtered = results\n    .filter(item => {\n      const text = (\n        (item.title || \"\") +\n        \" \" +\n        (item.snippet || \"\")\n      ).toLowerCase();\n\n      return (\n        text.includes(\"bits pilani\") ||\n        text.includes(\"birla institute of technology and science\")\n      );\n    })\n    .map(item => {\n\n      const title = item.title || \"\";\n\n      let name = title.split(\"-\")[0].trim();\n\n      let position = \"\";\n      if (title.includes(\"-\")) {\n        position = title.split(\"-\").slice(1).join(\"-\").trim();\n      }\n\n      return {\n        json: {\n          Company: company,\n          AlumName: name,\n          LinkedInProfile: item.link || \"\",\n          Post: position,\n          Snippet: item.snippet || \"\"\n        }\n      };\n    });\n\n  output.push(...filtered);\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "e886acc2-54f0-45e0-9b13-63255855f5be",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1456,
+        0
+      ],
+      "id": "7845b9a5-b9cd-4c41-aed3-80768f0e46fa",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  \n  { json: { company: \"Databricks\" } },\n  { json: { company: \"Snowflake\" } },\n  { json: { company: \"Palantir\" } },\n  { json: { company: \"MongoDB\" } },\n  { json: { company: \"Confluent\" } },\n  { json: { company: \"Cloudflare\" } },\n\n  { json: { company: \"OpenAI\" } },\n  { json: { company: \"Anthropic\" } },\n  { json: { company: \"Cohere\" } },\n\n  { json: { company: \"Tencent\" } },\n  { json: { company: \"Alibaba Cloud\" } },\n  { json: { company: \"Huawei\" } },\n  { json: { company: \"Samsung Electronics\" } }\n\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "481a57ac-988c-48fd-81cc-1b0fde7e18ec",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const seen = new Set();\n\nreturn items.filter(item => {\n  const profile = item.json.LinkedInProfile;\n\n  if (!profile || seen.has(profile)) {\n    return false;\n  }\n\n  seen.add(profile);\n  return true;\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "237d003a-f867-4394-b702-aabd8eec7757",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return items.map(item => {\n\n  const post = (item.json.Post || \"\").toLowerCase();\n\n  let score = 1;\n  let level = \"Entry\";\n\n  if (\n    post.includes(\"founder\") ||\n    post.includes(\"co-founder\") ||\n    post.includes(\"ceo\") ||\n    post.includes(\"cto\") ||\n    post.includes(\"cfo\")\n  ) {\n    score = 20;\n    level = \"Executive\";\n  }\n\n  else if (\n    post.includes(\"partner\") ||\n    post.includes(\"managing director\")\n  ) {\n    score = 15;\n    level = \"Executive\";\n  }\n\n  else if (\n    post.includes(\"executive director\") ||\n    post.includes(\"director\")\n  ) {\n    score = 12;\n    level = \"Director\";\n  }\n\n  else if (\n    post.includes(\"vice president\") ||\n    post.includes(\"vp\")\n  ) {\n    score = 10;\n    level = \"VP\";\n  }\n\n  else if (\n    post.includes(\"head of\") ||\n    post.includes(\"principal\")\n  ) {\n    score = 8;\n    level = \"Leadership\";\n  }\n\n  else if (\n    post.includes(\"manager\") ||\n    post.includes(\"lead\")\n  ) {\n    score = 6;\n    level = \"Manager\";\n  }\n\n  else if (\n    post.includes(\"senior\")\n  ) {\n    score = 4;\n    level = \"Senior\";\n  }\n\n  else if (\n    post.includes(\"engineer\") ||\n    post.includes(\"developer\") ||\n    post.includes(\"analyst\") ||\n    post.includes(\"associate\")\n  ) {\n    score = 3;\n    level = \"Individual Contributor\";\n  }\n\n  item.json.SeniorityScore = score;\n  item.json.SeniorityLevel = level;\n\n  return item;\n\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "bb3a45c9-3e45-4f58-b528-8c15e389485b",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "sortFieldsUi": {
+          "sortField": [
+            {
+              "fieldName": "SeniorityScore",
+              "order": "descending"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.sort",
+      "typeVersion": 1,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "11588e0a-2d3a-457b-a82b-435cabc0f19b",
+      "name": "Sort"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Sort",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "dfcc7727-e703-4e46-82a7-eb92940315b9",
+  "nodeGroups": [],
+  "id": "lwYAPGCKQZFhugWr",
+  "tags": []
+}
